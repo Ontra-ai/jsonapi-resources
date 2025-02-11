@@ -76,7 +76,7 @@ module JSONAPI
 
     def setup_show_related_resource_action(params, resource_klass)
       resolve_singleton_id(params, resource_klass)
-      source_klass = Resource.resource_klass_for(params.require(:source))
+      source_klass = resource_klass.resource_klass_for(params.require(:source))
       source_id = source_klass.verify_key(params.require(source_klass._as_parent_key), @context)
 
       fields = parse_fields(resource_klass, params[:fields])
@@ -98,7 +98,7 @@ module JSONAPI
 
     def setup_index_related_resources_action(params, resource_klass)
       resolve_singleton_id(params, resource_klass)
-      source_klass = Resource.resource_klass_for(params.require(:source))
+      source_klass = resource_klass.resource_klass_for(params.require(:source))
       source_id = source_klass.verify_key(params.require(source_klass._as_parent_key), @context)
 
       fields = parse_fields(resource_klass, params[:fields])
@@ -301,7 +301,7 @@ module JSONAPI
           if type != format_key(type)
             fail JSONAPI::Exceptions::InvalidResource.new(type, error_object_overrides)
           end
-          type_resource = Resource.resource_klass_for(resource_klass.module_path + underscored_type.to_s)
+          type_resource = resource_klass.resource_klass_for(underscored_type.to_s)
         rescue NameError
           fail JSONAPI::Exceptions::InvalidResource.new(type, error_object_overrides)
         end
@@ -338,7 +338,7 @@ module JSONAPI
         end
 
         unless include_parts.last.empty?
-          check_include(Resource.resource_klass_for(resource_klass.module_path + relationship.class_name.to_s.underscore),
+          check_include(resource_klass.resource_klass_for_model_class_name(relationship.class_name),
                         include_parts.last.partition('.'))
         end
       else
@@ -589,7 +589,7 @@ module JSONAPI
             fail JSONAPI::Exceptions::TypeMismatch.new(links_object[:type])
           end
 
-          relationship_resource_klass = Resource.resource_klass_for(resource_klass.module_path + relationship_type)
+          relationship_resource_klass = resource_klass.resource_klass_for(relationship_type)
           add_result.call relationship_resource_klass.verify_keys(links_object[relationship_type], @context)
         end
       end
