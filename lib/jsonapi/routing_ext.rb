@@ -233,7 +233,7 @@ module ActionDispatch
           if relationship.polymorphic?
             options[:controller] ||= relationship.class_name.underscore.pluralize
           else
-            related_resource = JSONAPI::Resource.resource_klass_for(resource_type_with_module_prefix(relationship.class_name.underscore.pluralize))
+            related_resource = source.resource_klass_for_model_class_name(relationship.class_name)
             options[:controller] ||= related_resource._type.to_s
           end
 
@@ -253,7 +253,7 @@ module ActionDispatch
           relationship._routed = true
 
           formatted_relationship_name = format_route(relationship.name)
-          related_resource = JSONAPI::Resource.resource_klass_for(resource_type_with_module_prefix(relationship.class_name.underscore))
+          related_resource = source.resource_klass_for_model_class_name(relationship.class_name)
           options[:controller] ||= related_resource._type.to_s
 
           match formatted_relationship_name,

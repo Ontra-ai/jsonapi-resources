@@ -516,7 +516,7 @@ module JSONAPI
         subclass._warned_missing_route = false
 
         subclass._attribute_options_cache = {}
-        subclass._model_class_to_resource_type_cache = {}
+        subclass._model_class_name_to_resource_type_cache = {}
         subclass._resource_type_to_class_cache = {}
 
         subclass._clear_fields_cache
@@ -556,6 +556,10 @@ module JSONAPI
         end
       end
 
+      def resource_klass_for_model_class_name(model_class_name)
+        resource_klass_for(resource_type_for_model_class_name(model_class_name))
+      end
+
       def resource_klass_for_model(model)
         resource_klass_for(resource_type_for(model))
       end
@@ -565,8 +569,12 @@ module JSONAPI
       end
 
       def resource_type_for(model)
-        @_model_class_to_resource_type_cache.fetch(model.class) do
-          model_name = model.class.name.underscore
+        resource_type_for_model_class_name(model.class.name)
+      end
+
+      def resource_type_for_model_class_name(model_class_name)
+        @_model_class_name_to_resource_type_cache.fetch(model_class_name) do
+          model_name = model_class_name.underscore
 
           resource_type = if _model_hints[model_name]
                             _model_hints[model_name]
@@ -574,7 +582,7 @@ module JSONAPI
                             model_name.rpartition('/').last
                           end
 
-          @_model_class_to_resource_type_cache[model.class] = resource_type
+          @_model_class_name_to_resource_type_cache[model_class_name] = resource_type.pluralize
         end
       end
 
@@ -593,7 +601,7 @@ module JSONAPI
       attr_writer :_allowed_filters,
                   :_paginator,
                   :_allowed_sort,
-                  :_model_class_to_resource_type_cache,
+                  :_model_class_name_to_resource_type_cache,
                   :_resource_type_to_class_cache,
                   :_attribute_options_cache
 
@@ -1229,7 +1237,7 @@ module JSONAPI
       end
 
       def _clear_model_to_resource_type_cache
-        @_model_class_to_resource_type_cache&.clear
+        @_model_class_name_to_resource_type_cache&.clear
       end
 
       def _clear_resource_type_to_klass_cache
