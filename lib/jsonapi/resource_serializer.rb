@@ -24,8 +24,7 @@ module JSONAPI
       @primary_resource_klass = primary_resource_klass
       @fields                 = options.fetch(:fields, {})
       @include                = options.fetch(:include, [])
-      @include_directives     = options.fetch(:include_directives,
-                                              JSONAPI::IncludeDirectives.new(@primary_resource_klass, @include))
+      @include_directives     = options.fetch(:include_directives, default_include_directives(@primary_resource_klass, @include))
       @key_formatter          = options.fetch(:key_formatter, JSONAPI.configuration.key_formatter)
       @id_formatter           = ValueFormatter.value_formatter_for(:id)
       @link_builder           = generate_link_builder(primary_resource_klass, options)
@@ -42,6 +41,20 @@ module JSONAPI
       @_config_keys = {}
       @_supplying_attribute_fields = {}
       @_supplying_relationship_fields = {}
+    end
+
+    # Reflect on the primary resource class to determine the default include directives
+    # If a relationship has always_include_linkage_data set to true, it will be included by default
+    #
+    # @return [JSONAPI::IncludeDirectives] the include directives for this serializer
+    def default_include_directives(primary_resource_klass, includes)
+      always_include_to_many_linkage_data_relationships =
+        primary_resource_klass._relationships.select { |_,v| v.options[:always_include_linkage_data] }.keys.map(&:to_s)
+
+      JSONAPI::IncludeDirectives.new(
+        primary_resource_klass,
+        (includes + always_include_to_many_linkage_data_relationships).uniq
+      )
     end
 
     # Converts a single resource, or an array of resources to a hash, conforming to the JSONAPI structure
@@ -69,7 +82,8 @@ module JSONAPI
 
           if resource[:primary]
             primary_objects.push(serialized_resource)
-          else
+          # Only include the resource if it is in the include list
+          elsif @include.include?(resource[:resource].class._type.to_s)
             included_objects.push(serialized_resource)
           end
         end
@@ -310,13 +324,11 @@ module JSONAPI
           relationship_klass = source.resource_klass._relationship(relationship_name)
 
           if relationship_klass.is_a?(JSONAPI::Relationship::ToOne)
-            # include_linkage = @always_include_to_one_linkage_data | relationship_klass.always_include_linkage_data
             if relationship_data[relationship_name]
               rids = relationship_data[relationship_name].first
               relationship['data'] = to_one_linkage(rids)
             end
           else
-            # include_linkage = relationship_klass.always_include_linkage_data
             if relationship_data[relationship_name]
               rids = relationship_data[relationship_name]
               relationship['data'] = to_many_linkage(rids)
