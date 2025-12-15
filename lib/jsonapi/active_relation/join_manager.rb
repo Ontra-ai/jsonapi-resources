@@ -8,6 +8,7 @@ module JSONAPI
   class JoinManager
       attr_reader :resource_klass,
                   :source_relationship,
+                  :source_resource_klass,
                   :resource_join_tree,
                   :join_details,
                   :through_source

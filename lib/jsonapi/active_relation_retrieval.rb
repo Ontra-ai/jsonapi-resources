@@ -306,8 +306,11 @@ module JSONAPI
       def find_related_fragments_from_inverse(source, source_relationship, options, connect_source_identity)
         inverse_relationship = source_relationship._inverse_relationship
         return {} if inverse_relationship.blank?
+        return {} if source.empty? # if source is empty, there are no related fragments to find
 
-        parent_resource_klass = inverse_relationship.resource_klass
+        # For polymorphic inverse relationships, we need to know the source resource type
+        source_resource_klass = source.first.identity.resource_klass
+        parent_resource_klass = inverse_relationship.polymorphic? ? source_resource_klass : inverse_relationship.resource_klass
 
         include_directives = options.fetch(:include_directives, {})
 
@@ -333,6 +336,7 @@ module JSONAPI
 
         join_manager = ActiveRelation::JoinManager.new(resource_klass: self,
                                                        source_relationship: inverse_relationship,
+                                                       source_resource_klass: source_resource_klass,
                                                        relationships: linkage_relationships.collect(&:name),
                                                        sort_criteria: sort_criteria,
                                                        filters: filters)
@@ -352,7 +356,13 @@ module JSONAPI
         if options[:cache]
           # This alias is going to be resolve down to the model's table name and will not actually be an alias
           resource_table_alias = self._table_name
-          parent_table_alias = join_manager.join_details_by_relationship(inverse_relationship)[:alias]
+
+          # For polymorphic inverse relationships, we need to pass the specific resource type
+          if inverse_relationship.polymorphic? && source_resource_klass
+            parent_table_alias = join_manager.source_join_details(source_resource_klass._type.to_s)[:alias]
+          else
+            parent_table_alias = join_manager.join_details_by_relationship(inverse_relationship)[:alias]
+          end
 
           pluck_fields = [
             sql_field_with_alias(resource_table_alias, self._primary_key),
@@ -452,7 +462,13 @@ module JSONAPI
             end
           end
 
-          parent_table_alias = join_manager.join_details_by_relationship(inverse_relationship)[:alias]
+          # For polymorphic inverse relationships, we need to pass the specific resource type
+          if inverse_relationship.polymorphic? && source_resource_klass
+            parent_table_alias = join_manager.source_join_details(source_resource_klass._type.to_s)[:alias]
+          else
+            parent_table_alias = join_manager.join_details_by_relationship(inverse_relationship)[:alias]
+          end
+
           source_field = sql_field_with_fixed_alias(parent_table_alias, parent_resource_klass._primary_key, "jr_source_id")
 
           records = records.select(concat_table_field(_table_name, Arel.star), source_field)
@@ -663,8 +679,18 @@ module JSONAPI
         records = resource_klass.apply_joins(records, join_manager, options)
 
         if source_ids
-          source_join_details = join_manager.source_join_details
-          source_primary_key = join_manager.source_relationship.resource_klass._primary_key
+          source_relationship = join_manager.source_relationship
+
+          # For polymorphic relationships, we need to pass the specific resource type
+          if source_relationship.polymorphic? && join_manager.source_resource_klass
+            source_resource_klass = join_manager.source_resource_klass
+            source_type = source_resource_klass._type.to_s
+            source_join_details = join_manager.source_join_details(source_type)
+            source_primary_key = source_resource_klass._primary_key
+          else
+            source_join_details = join_manager.source_join_details
+            source_primary_key = source_relationship.resource_klass._primary_key
+          end
 
           source_aliased_key = concat_table_field(source_join_details[:alias], source_primary_key, false)
           records = records.where(source_aliased_key => source_ids)
