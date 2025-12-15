@@ -681,8 +681,8 @@ module JSONAPI
           source_relationship = join_manager.source_relationship
 
           # For polymorphic relationships, we need to pass the specific resource type
-          if source_relationship.polymorphic? && join_manager.instance_variable_get(:@source_resource_klass)
-            source_resource_klass = join_manager.instance_variable_get(:@source_resource_klass)
+          if source_relationship.polymorphic? && join_manager.source_resource_klass
+            source_resource_klass = join_manager.source_resource_klass
             source_type = source_resource_klass._type.to_s
             source_join_details = join_manager.source_join_details(source_type)
             source_primary_key = source_resource_klass._primary_key
