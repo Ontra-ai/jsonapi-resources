@@ -306,9 +306,10 @@ module JSONAPI
       def find_related_fragments_from_inverse(source, source_relationship, options, connect_source_identity)
         inverse_relationship = source_relationship._inverse_relationship
         return {} if inverse_relationship.blank?
+        return {} if source.empty? # if source is empty, there are no related fragments to find
 
         # For polymorphic inverse relationships, we need to know the source resource type
-        source_resource_klass = source.first&.identity&.resource_klass
+        source_resource_klass = source.first.identity.resource_klass
         parent_resource_klass = inverse_relationship.polymorphic? ? source_resource_klass : inverse_relationship.resource_klass
 
         include_directives = options.fetch(:include_directives, {})
