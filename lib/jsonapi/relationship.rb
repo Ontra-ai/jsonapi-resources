@@ -180,13 +180,14 @@ module JSONAPI
     end
 
     class ToOne < Relationship
-      attr_reader :foreign_key_on
+      attr_reader :foreign_key_on, :auto_generate_polymorphic_associations
 
       def initialize(name, options = {})
         super
         @class_name = options.fetch(:class_name, name.to_s.classify)
         @foreign_key ||= "#{name}_id".to_sym
         @foreign_key_on = options.fetch(:foreign_key_on, :self)
+        @auto_generate_polymorphic_associations = options.fetch(:auto_generate_polymorphic_associations, true)
         # if parent_resource
         #   @inverse_relationship = options.fetch(:inverse_relationship, parent_resource._type)
         # end
@@ -194,6 +195,12 @@ module JSONAPI
         if options.fetch(:create_implicit_polymorphic_type_relationships, true) == true && polymorphic?
           # Setup the implicit relationships for the polymorphic types and exclude linkage data
           setup_implicit_relationships_for_polymorphic_types
+        end
+
+        # Automatically define the prefixed belongs_to associations on the model
+        # that are required for ActiveRecord joins to work (if enabled)
+        if polymorphic? && belongs_to? && @auto_generate_polymorphic_associations
+          define_model_polymorphic_associations
         end
 
         @polymorphic_type_relationship_for = options[:polymorphic_type_relationship_for]
@@ -219,6 +226,28 @@ module JSONAPI
         "#{name}_type" if polymorphic?
       end
 
+      # Returns the association name to use for joins on a specific polymorphic type.
+      #
+      # If auto_generate_polymorphic_associations is true (default), returns a prefixed
+      # association name that will be auto-generated (e.g., :__jsonapi_polymorphic_relationship_imageable_document).
+      #
+      # If auto_generate_polymorphic_associations is false, returns the unprefixed
+      # association name that you must manually define (e.g., :document).
+      #
+      # @param resource_type [String, Symbol] The resource type (e.g., 'documents', 'products')
+      # @return [Symbol] The association name to use for joins
+      def polymorphic_association_name(resource_type)
+        return nil unless polymorphic? && belongs_to?
+
+        type_singularized = resource_type.to_s.singularize.underscore
+
+        if @auto_generate_polymorphic_associations
+          "__jsonapi_polymorphic_relationship_#{name}_#{type_singularized}".to_sym
+        else
+          type_singularized.to_sym
+        end
+      end
+
       def setup_implicit_relationships_for_polymorphic_types(exclude_linkage_data: true)
         types = polymorphic_types
 
@@ -227,6 +256,43 @@ module JSONAPI
                                   exclude_linkage_data: exclude_linkage_data,
                                   polymorphic_type_relationship_for: name,
                                   inverse_relationship: @inverse_relationship)
+        end
+      end
+
+      # Automatically creates prefixed belongs_to associations on the model for each
+      # polymorphic type. This allows ActiveRecord's .joins() to work without requiring
+      # manual association definitions in the model.
+      #
+      # For example, if you have:
+      #   has_one :imageable, polymorphic: true
+      #
+      # And imageable can be a Document or Product, this will automatically create on the model:
+      #   belongs_to :__jsonapi_polymorphic_relationship_imageable_document, foreign_key: :imageable_id, class_name: 'Document', ...
+      #   belongs_to :__jsonapi_polymorphic_relationship_imageable_product, foreign_key: :imageable_id, class_name: 'Product', ...
+      def define_model_polymorphic_associations
+        return unless parent_resource
+
+        model_class = parent_resource._model_class
+        return unless model_class
+
+        types = polymorphic_types
+        fk = foreign_key
+        type_column = polymorphic_type
+        table_name = parent_resource._table_name
+
+        types.each do |type|
+          class_name = parent_resource.resource_klass_for(type)._model_class.name
+          association_name = polymorphic_association_name(type)
+
+          # Skip if already defined (allows manual override)
+          next if model_class.reflect_on_association(association_name)
+
+          # Define the belongs_to association with a scope that filters by the polymorphic type
+          model_class.belongs_to association_name,
+                                 -> { where(table_name => { type_column => class_name }) },
+                                 foreign_key: fk,
+                                 class_name: class_name,
+                                 optional: true
         end
       end
 

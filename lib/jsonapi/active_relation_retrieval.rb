@@ -596,11 +596,13 @@ module JSONAPI
 
       def apply_join(records:, relationship:, resource_type:, join_type:, options:)
         if relationship.polymorphic? && relationship.belongs_to?
+          # Use the prefixed association name that was auto-generated on the model
+          association_name = relationship.polymorphic_association_name(resource_type)
           case join_type
           when :inner
-            records = records.joins(resource_type.to_s.singularize.to_sym)
+            records = records.joins(association_name)
           when :left
-            records = records.joins_left(resource_type.to_s.singularize.to_sym)
+            records = records.joins_left(association_name)
           end
         else
           relation_name = relationship.relation_name(options)
