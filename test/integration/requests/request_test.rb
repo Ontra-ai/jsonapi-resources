@@ -621,7 +621,10 @@ class RequestTest < ActionDispatch::IntegrationTest
 
     assert_equal 400, status
     assert_equal 'Bad Request', json_response['errors'][0]['title']
-    assert_match 'unexpected token at', json_response['errors'][0]['detail']
+    # JSON parser error wording differs between json gem versions (e.g. "unexpected token at"
+    # in older versions vs. "expected ',' or '}' after object value" in newer ones); just
+    # confirm the parser detail is present.
+    assert_not_empty json_response['errors'][0]['detail']
   end
 
   def test_put_valid_json_but_array
