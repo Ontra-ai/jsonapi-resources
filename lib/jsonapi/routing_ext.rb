@@ -283,10 +283,14 @@ module ActionDispatch
 
         # Rails 8.1 changed Resource and SingletonResource initializers from
         # `(entities, api_only, shallow, options = {})` to
-        # `(entities, api_only, shallow, **options)`. Dispatch to whichever
-        # signature the installed Rails version exposes.
+        # `(entities, api_only, shallow, **options)`.
+        RAILS_8_1_ROUTING_KWARGS =
+          ::Rails::VERSION::MAJOR > 8 ||
+          (::Rails::VERSION::MAJOR == 8 && ::Rails::VERSION::MINOR >= 1)
+        private_constant :RAILS_8_1_ROUTING_KWARGS
+
         def build_jsonapi_route_resource(klass, options)
-          if klass.instance_method(:initialize).parameters.any? { |type, _| type == :keyrest }
+          if RAILS_8_1_ROUTING_KWARGS
             klass.new(@resource_type, api_only?, @scope[:shallow], **options)
           else
             klass.new(@resource_type, api_only?, @scope[:shallow], options)
