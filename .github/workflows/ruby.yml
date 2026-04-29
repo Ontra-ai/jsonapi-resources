@@ -42,15 +42,19 @@ jobs:
           - '3.2'
           - '3.1'
         rails:
-          - '7.1'
-          - '7.0'
+          - '7.2'
+          - '8.0'
+          - '8.1'
         database_url:
           - sqlite3:test_db
           - postgresql://postgres:password@localhost:5432/test
           - mysql2://root:root@127.0.0.1:3306/test
-#        exclude:
-#          - ruby: '3.1'
-#            rails: '6.0'
+        exclude:
+          # Rails 8.x requires Ruby >= 3.2
+          - ruby: '3.1'
+            rails: '8.0'
+          - ruby: '3.1'
+            rails: '8.1'
     env:
       RAILS_VERSION: ${{ matrix.rails }}
       DATABASE_URL: ${{ matrix.database_url }}

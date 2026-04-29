@@ -46,7 +46,7 @@ module ActionDispatch
             options[:except] << :destroy unless options[:except].include?(:destroy) || options[:except].include?('destroy')
           end
 
-          resource @resource_type, options do
+          resource @resource_type, **options do
             # :nocov:
             if @scope.respond_to? :[]=
               # Rails 4
@@ -121,7 +121,7 @@ module ActionDispatch
             options[:except] << :destroy unless options[:except].include?(:destroy) || options[:except].include?('destroy')
           end
 
-          resources @resource_type, options do
+          resources @resource_type, **options do
             # :nocov:
             if @scope.respond_to? :[]=
               # Rails 4
