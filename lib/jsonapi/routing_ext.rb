@@ -46,7 +46,7 @@ module ActionDispatch
             options[:except] << :destroy unless options[:except].include?(:destroy) || options[:except].include?('destroy')
           end
 
-          resource @resource_type, options do
+          resource @resource_type, **options do
             # :nocov:
             if @scope.respond_to? :[]=
               # Rails 4
@@ -59,7 +59,7 @@ module ActionDispatch
               end
             else
               # Rails 5
-              jsonapi_resource_scope(SingletonResource.new(@resource_type, api_only?, @scope[:shallow], options), @resource_type) do
+              jsonapi_resource_scope(build_jsonapi_route_resource(SingletonResource, options), @resource_type) do
                 if block_given?
                   yield
                 else
@@ -121,7 +121,7 @@ module ActionDispatch
             options[:except] << :destroy unless options[:except].include?(:destroy) || options[:except].include?('destroy')
           end
 
-          resources @resource_type, options do
+          resources @resource_type, **options do
             # :nocov:
             if @scope.respond_to? :[]=
               # Rails 4
@@ -133,7 +133,7 @@ module ActionDispatch
               end
             else
               # Rails 5
-              jsonapi_resource_scope(Resource.new(@resource_type, api_only?, @scope[:shallow], options), @resource_type) do
+              jsonapi_resource_scope(build_jsonapi_route_resource(Resource, options), @resource_type) do
                 if block_given?
                   yield
                 else
@@ -279,6 +279,17 @@ module ActionDispatch
         def resource_type_with_module_prefix(resource = nil)
           resource_name = resource || @scope[:jsonapi_resource]
           [@scope[:module], resource_name].compact.collect(&:to_s).join('/')
+        end
+
+        # Rails 8.1 changed Resource and SingletonResource initializers from
+        # `(entities, api_only, shallow, options = {})` to
+        # `(entities, api_only, shallow, **options)`.
+        def build_jsonapi_route_resource(klass, options)
+          if ::Rails::VERSION::MAJOR > 8 || (::Rails::VERSION::MAJOR == 8 && ::Rails::VERSION::MINOR >= 1)
+            klass.new(@resource_type, api_only?, @scope[:shallow], **options)
+          else
+            klass.new(@resource_type, api_only?, @scope[:shallow], options)
+          end
         end
       end
     end
