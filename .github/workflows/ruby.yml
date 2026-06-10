@@ -11,7 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres
+        image: docker-all.facts.ontra.tools/postgres
+        credentials:
+          username: ${{ secrets.NEXUS_USER_TOKEN_NAME_CODE }}
+          password: ${{ secrets.NEXUS_USER_TOKEN_PASS_CODE }}
         env:
           POSTGRES_PASSWORD: password
           POSTGRES_DB: test
