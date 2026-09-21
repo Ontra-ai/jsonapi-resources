@@ -68,18 +68,33 @@ class JSONAPIRequestTest < ActiveSupport::TestCase
     end
   end
 
-  def test_parse_to_many_relationship_falls_back_to_subclasses_without_declared_types
-    relationship = SubscriptionResource._relationship(:feeds)
+  def parse_linkage_without_declared_types(resource_klass, relationship_name, links)
+    relationship = resource_klass._relationship(relationship_name)
+    parsed = nil
 
     relationship.stub(:polymorphic_types, []) do
-      assert_raises(JSONAPI::Exceptions::TypeMismatch) do
-        request = JSONAPI::Request.new(
-          ActionController::Parameters.new({}),
-          { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
-        )
-        request.parse_to_many_relationship(SubscriptionResource, { data: [{ 'type' => 'podcasts', 'id' => '1' }] },
-                                           relationship) { |_result| }
-      end
+      request = JSONAPI::Request.new(
+        ActionController::Parameters.new({}),
+        { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
+      )
+      request.parse_to_many_relationship(resource_klass, { data: links }, relationship) { |result| parsed = result }
+    end
+
+    parsed
+  end
+
+  # Declaring `polymorphic_types` is optional, so the subclass check has to keep working for
+  # relationships that rely on the inferred lookup instead. PersonResource#vehicles is that shape:
+  # Car and Boat are STI subclasses of Vehicle.
+  def test_parse_to_many_relationship_accepts_a_subclass_when_no_types_are_declared
+    parsed = parse_linkage_without_declared_types(PersonResource, :vehicles, [{ 'type' => 'cars', 'id' => '1' }])
+
+    assert_equal [{ type: 'cars', ids: [1] }], parsed
+  end
+
+  def test_parse_to_many_relationship_refuses_an_unrelated_model_when_no_types_are_declared
+    assert_raises(JSONAPI::Exceptions::TypeMismatch) do
+      parse_linkage_without_declared_types(SubscriptionResource, :feeds, [{ 'type' => 'podcasts', 'id' => '1' }])
     end
   end
 
