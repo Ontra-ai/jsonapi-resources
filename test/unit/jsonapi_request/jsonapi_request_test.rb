@@ -20,7 +20,77 @@ class TreeResource < JSONAPI::Resource
   end
 end
 
+module PolymorphicLinkage
+  class AttachmentResource < JSONAPI::Resource
+    polymorphic
+  end
+
+  class DocumentResource < JSONAPI::Resource
+    model_name 'Document'
+  end
+
+  class ProductResource < JSONAPI::Resource
+    model_name 'Product'
+  end
+
+  class CatalogResource < JSONAPI::Resource
+    model_name 'Document'
+    has_many :attachments, polymorphic: true, polymorphic_types: %w[documents products]
+  end
+end
+
 class JSONAPIRequestTest < ActiveSupport::TestCase
+  def parse_attachment_linkage(links)
+    request = JSONAPI::Request.new(
+      ActionController::Parameters.new({}),
+      { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
+    )
+    parsed = nil
+    catalog = PolymorphicLinkage::CatalogResource
+    request.parse_to_many_relationship(catalog, { data: links },
+                                       catalog._relationship(:attachments)) { |result| parsed = result }
+    parsed
+  end
+
+  def test_parse_to_many_relationship_accepts_every_declared_polymorphic_type
+    parsed = parse_attachment_linkage([{ 'type' => 'documents', 'id' => '1' }, { 'type' => 'products', 'id' => '2' }])
+
+    assert_equal [{ type: 'documents', ids: [1] }, { type: 'products', ids: [2] }], parsed
+  end
+
+  def test_parse_to_many_relationship_refuses_an_undeclared_polymorphic_type
+    assert_raises(JSONAPI::Exceptions::TypeMismatch) do
+      parse_attachment_linkage([{ 'type' => 'catalogs', 'id' => '1' }])
+    end
+  end
+
+  def parse_linkage_without_declared_types(resource_klass, relationship_name, links)
+    relationship = resource_klass._relationship(relationship_name)
+    parsed = nil
+
+    relationship.stub(:polymorphic_types, []) do
+      request = JSONAPI::Request.new(
+        ActionController::Parameters.new({}),
+        { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
+      )
+      request.parse_to_many_relationship(resource_klass, { data: links }, relationship) { |result| parsed = result }
+    end
+
+    parsed
+  end
+
+  def test_parse_to_many_relationship_accepts_a_subclass_when_no_types_are_declared
+    parsed = parse_linkage_without_declared_types(PersonResource, :vehicles, [{ 'type' => 'cars', 'id' => '1' }])
+
+    assert_equal [{ type: 'cars', ids: [1] }], parsed
+  end
+
+  def test_parse_to_many_relationship_refuses_an_unrelated_model_when_no_types_are_declared
+    assert_raises(JSONAPI::Exceptions::TypeMismatch) do
+      parse_linkage_without_declared_types(PersonResource, :vehicles, [{ 'type' => 'people', 'id' => '1' }])
+    end
+  end
+
   def test_parse_includes_underscored
     params = ActionController::Parameters.new(
       {
