@@ -20,51 +20,50 @@ class TreeResource < JSONAPI::Resource
   end
 end
 
-# Polymorphic targets that are not STI siblings: each owns its own base, the way records fetched
-# from another service do.
-class Feed; end
-class Podcast; end
-class Newsletter; end
-class Subscription; end
+# Namespaced so the shared fixture models can be reused without adding top-level constants.
+# Document and Product are unrelated models, which is the shape the declared-types check exists
+# for: targets owned by different services can never be STI siblings.
+module PolymorphicLinkage
+  class AttachmentResource < JSONAPI::Resource
+    polymorphic
+  end
 
-class FeedResource < JSONAPI::Resource
-  model_name 'Feed'
-end
+  class DocumentResource < JSONAPI::Resource
+    model_name 'Document'
+  end
 
-class PodcastResource < JSONAPI::Resource
-  model_name 'Podcast'
-end
+  class ProductResource < JSONAPI::Resource
+    model_name 'Product'
+  end
 
-class NewsletterResource < JSONAPI::Resource
-  model_name 'Newsletter'
-end
-
-class SubscriptionResource < JSONAPI::Resource
-  model_name 'Subscription'
-  has_many :feeds, polymorphic: true, polymorphic_types: %w[podcasts newsletters]
+  class CatalogResource < JSONAPI::Resource
+    model_name 'Document'
+    has_many :attachments, polymorphic: true, polymorphic_types: %w[documents products]
+  end
 end
 
 class JSONAPIRequestTest < ActiveSupport::TestCase
-  def parse_feeds_linkage(links)
+  def parse_attachment_linkage(links)
     request = JSONAPI::Request.new(
       ActionController::Parameters.new({}),
       { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
     )
     parsed = nil
-    request.parse_to_many_relationship(SubscriptionResource, { data: links },
-                                       SubscriptionResource._relationship(:feeds)) { |result| parsed = result }
+    catalog = PolymorphicLinkage::CatalogResource
+    request.parse_to_many_relationship(catalog, { data: links },
+                                       catalog._relationship(:attachments)) { |result| parsed = result }
     parsed
   end
 
   def test_parse_to_many_relationship_accepts_every_declared_polymorphic_type
-    parsed = parse_feeds_linkage([{ 'type' => 'podcasts', 'id' => '1' }, { 'type' => 'newsletters', 'id' => '2' }])
+    parsed = parse_attachment_linkage([{ 'type' => 'documents', 'id' => '1' }, { 'type' => 'products', 'id' => '2' }])
 
-    assert_equal [{ type: 'podcasts', ids: [1] }, { type: 'newsletters', ids: [2] }], parsed
+    assert_equal [{ type: 'documents', ids: [1] }, { type: 'products', ids: [2] }], parsed
   end
 
   def test_parse_to_many_relationship_refuses_an_undeclared_polymorphic_type
     assert_raises(JSONAPI::Exceptions::TypeMismatch) do
-      parse_feeds_linkage([{ 'type' => 'people', 'id' => '1' }])
+      parse_attachment_linkage([{ 'type' => 'catalogs', 'id' => '1' }])
     end
   end
 
@@ -94,7 +93,7 @@ class JSONAPIRequestTest < ActiveSupport::TestCase
 
   def test_parse_to_many_relationship_refuses_an_unrelated_model_when_no_types_are_declared
     assert_raises(JSONAPI::Exceptions::TypeMismatch) do
-      parse_linkage_without_declared_types(SubscriptionResource, :feeds, [{ 'type' => 'podcasts', 'id' => '1' }])
+      parse_linkage_without_declared_types(PersonResource, :vehicles, [{ 'type' => 'people', 'id' => '1' }])
     end
   end
 
