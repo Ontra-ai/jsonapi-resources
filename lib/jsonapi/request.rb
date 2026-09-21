@@ -468,6 +468,24 @@ module JSONAPI
       }
     end
 
+    # Declared `polymorphic_types` are the contract for which types a relationship accepts. Falling
+    # back to subclasses of the relationship's model only holds when every target is an STI sibling,
+    # which targets owned by another service cannot be -- they inherit their own transport base.
+    def polymorphic_linkage_type?(resource_klass, relationship, linkage_object_resource_klass)
+      declared_types = relationship.polymorphic_types
+
+      if declared_types.present?
+        return declared_types.any? do |type|
+          resource_klass.resource_klass_for(type) == linkage_object_resource_klass
+        end
+      end
+
+      relationship_klass = resource_klass.resource_klass_for(relationship.class_name)._model_class
+      linkage_object_klass = linkage_object_resource_klass._model_class
+
+      linkage_object_klass == relationship_klass || linkage_object_klass.in?(relationship_klass.subclasses)
+    end
+
     def parse_to_many_links_object(raw)
       fail JSONAPI::Exceptions::InvalidLinksObject.new(error_object_overrides) if raw.nil?
 
@@ -568,12 +586,9 @@ module JSONAPI
             type_name = unformat_key(type).to_s
 
             relationship_resource_klass = resource_klass.resource_klass_for(relationship.class_name)
-            relationship_klass = relationship_resource_klass._model_class
-
             linkage_object_resource_klass = resource_klass.resource_klass_for(type_name)
-            linkage_object_klass = linkage_object_resource_klass._model_class
 
-            unless linkage_object_klass == relationship_klass || linkage_object_klass.in?(relationship_klass.subclasses)
+            unless polymorphic_linkage_type?(resource_klass, relationship, linkage_object_resource_klass)
               fail JSONAPI::Exceptions::TypeMismatch.new(type_name)
             end
 

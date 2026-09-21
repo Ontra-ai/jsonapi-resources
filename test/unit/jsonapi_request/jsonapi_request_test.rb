@@ -20,7 +20,69 @@ class TreeResource < JSONAPI::Resource
   end
 end
 
+# Polymorphic targets that are not STI siblings: each owns its own base, the way records fetched
+# from another service do.
+class Feed; end
+class Podcast; end
+class Newsletter; end
+class Subscription; end
+
+class FeedResource < JSONAPI::Resource
+  model_name 'Feed'
+end
+
+class PodcastResource < JSONAPI::Resource
+  model_name 'Podcast'
+end
+
+class NewsletterResource < JSONAPI::Resource
+  model_name 'Newsletter'
+end
+
+class SubscriptionResource < JSONAPI::Resource
+  model_name 'Subscription'
+  has_many :feeds, polymorphic: true, polymorphic_types: %w[podcasts newsletters]
+end
+
 class JSONAPIRequestTest < ActiveSupport::TestCase
+  def parse_feeds_linkage(links)
+    request = JSONAPI::Request.new(
+      ActionController::Parameters.new({}),
+      { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
+    )
+    parsed = nil
+    request.parse_to_many_relationship(SubscriptionResource, { data: links },
+                                       SubscriptionResource._relationship(:feeds)) { |result| parsed = result }
+    parsed
+  end
+
+  def test_parse_to_many_relationship_accepts_every_declared_polymorphic_type
+    parsed = parse_feeds_linkage([{ 'type' => 'podcasts', 'id' => '1' }, { 'type' => 'newsletters', 'id' => '2' }])
+
+    assert_equal [{ type: 'podcasts', ids: [1] }, { type: 'newsletters', ids: [2] }], parsed
+  end
+
+  def test_parse_to_many_relationship_refuses_an_undeclared_polymorphic_type
+    assert_raises(JSONAPI::Exceptions::TypeMismatch) do
+      parse_feeds_linkage([{ 'type' => 'people', 'id' => '1' }])
+    end
+  end
+
+  def test_parse_to_many_relationship_falls_back_to_subclasses_without_declared_types
+    relationship = SubscriptionResource._relationship(:feeds)
+
+    relationship.stub(:polymorphic_types, []) do
+      assert_raises(JSONAPI::Exceptions::TypeMismatch) do
+        request = JSONAPI::Request.new(
+          ActionController::Parameters.new({}),
+          { context: nil, key_formatter: JSONAPI::Formatter.formatter_for(:underscored_key) }
+        )
+        request.parse_to_many_relationship(SubscriptionResource, { data: [{ 'type' => 'podcasts', 'id' => '1' }] },
+                                           relationship) { |_result| }
+      end
+    end
+  end
+
   def test_parse_includes_underscored
     params = ActionController::Parameters.new(
       {
