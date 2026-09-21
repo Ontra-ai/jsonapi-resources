@@ -20,9 +20,6 @@ class TreeResource < JSONAPI::Resource
   end
 end
 
-# Namespaced so the shared fixture models can be reused without adding top-level constants.
-# Document and Product are unrelated models, which is the shape the declared-types check exists
-# for: targets owned by different services can never be STI siblings.
 module PolymorphicLinkage
   class AttachmentResource < JSONAPI::Resource
     polymorphic
@@ -82,9 +79,6 @@ class JSONAPIRequestTest < ActiveSupport::TestCase
     parsed
   end
 
-  # Declaring `polymorphic_types` is optional, so the subclass check has to keep working for
-  # relationships that rely on the inferred lookup instead. PersonResource#vehicles is that shape:
-  # Car and Boat are STI subclasses of Vehicle.
   def test_parse_to_many_relationship_accepts_a_subclass_when_no_types_are_declared
     parsed = parse_linkage_without_declared_types(PersonResource, :vehicles, [{ 'type' => 'cars', 'id' => '1' }])
 

@@ -468,9 +468,7 @@ module JSONAPI
       }
     end
 
-    # Declared `polymorphic_types` are the contract for which types a relationship accepts. Falling
-    # back to subclasses of the relationship's model only holds when every target is an STI sibling,
-    # which targets owned by another service cannot be -- they inherit their own transport base.
+    # The subclass fallback only holds when every target is an STI sibling of the relationship's model.
     def polymorphic_linkage_type?(resource_klass, relationship, linkage_object_resource_klass)
       declared_types = relationship.polymorphic_types
 
