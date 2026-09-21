@@ -168,10 +168,7 @@ module JSONAPI
     end
 
     def verify_content_type_header
-      # `action_name`, not `params[:action]`: reading params parses the body, and a body sent under
-      # the wrong content type is exactly what this rejects -- a parse failure there surfaces as a
-      # 500 instead of the 415 the caller should get.
-      if ['create', 'create_relationship', 'update_relationship', 'update'].include?(action_name)
+      if ['create', 'create_relationship', 'update_relationship', 'update'].include?(params[:action])
         unless request.media_type == JSONAPI::MEDIA_TYPE
           fail JSONAPI::Exceptions::UnsupportedMediaTypeError.new(request.media_type)
         end

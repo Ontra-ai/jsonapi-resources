@@ -2,6 +2,11 @@ source 'https://rubygems.org'
 
 gemspec
 
+# TEMPORARY - json 3 takes parse options as keywords, while ActiveSupport::JSON.decode still
+# passes them positionally, so any application/json body fails to parse. Rails is recommending
+# this pin until that is fixed upstream.
+gem 'json', '< 3'
+
 platforms :jruby do
   gem 'activerecord-jdbcsqlite3-adapter'
 end
