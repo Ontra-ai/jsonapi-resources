@@ -468,7 +468,7 @@ module JSONAPI
       }
     end
 
-    # The subclass fallback only holds when every target is an STI sibling of the relationship's model.
+    # The subclass fallback is STI-only: every target must be the relationship's model or a child of it.
     def polymorphic_linkage_type?(resource_klass, relationship, linkage_object_resource_klass)
       declared_types = relationship.polymorphic_types
 
