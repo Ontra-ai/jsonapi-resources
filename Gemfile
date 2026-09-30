@@ -2,6 +2,9 @@ source 'https://rubygems.org'
 
 gemspec
 
+# TEMPORARY - ActiveSupport::JSON.decode passes parse options positionally, which json 3 rejects.
+gem 'json', '< 3'
+
 platforms :jruby do
   gem 'activerecord-jdbcsqlite3-adapter'
 end
