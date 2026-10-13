@@ -496,6 +496,9 @@ module JSONAPI
 
       private
 
+      # Rack 3.1 renamed :unprocessable_entity to :unprocessable_content and warns on the old
+      # symbol; every other status symbol in this file kept its name. ActionDispatch picks the
+      # symbol that matches the loaded Rack.
       def json_api_error(attr_key, message)
         create_error_object(code: JSONAPI::VALIDATION_ERROR,
                             status: ActionDispatch::Constants::UNPROCESSABLE_CONTENT,
